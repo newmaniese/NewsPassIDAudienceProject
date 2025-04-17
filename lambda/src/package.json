@@ -13,7 +13,7 @@
   "dependencies": {
     "aws-sdk": "^2.1532.0",
     "csv-parse": "^5.5.3",
-    "snowflake-sdk": "^1.6.24"
+    "snowflake-sdk": "^2.0.2"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.119",
