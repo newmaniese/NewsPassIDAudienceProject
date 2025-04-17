@@ -27,9 +27,9 @@ export interface GPPPingResponse {
 export interface GPP {
   (command: 'ping', callback: (pingData: GPPPingResponse) => void): void;
   (command: 'getGPPData', callback: GPPCallback): void;
-  (command: string, callback: GPPCallback, parameter?: any): void;
-  queue?: any[];
-  events?: any[];
+  (command: string, callback: GPPCallback, parameter?: unknown): void;
+  queue?: Array<[string, GPPCallback, unknown?]>;
+  events?: Array<[string, GPPCallback, unknown?]>;
 }
 
 // NewsPassID specific types
@@ -40,6 +40,8 @@ export interface NewsPassConfig {
   lambdaEndpoint: string;
   /** Custom storage key for localStorage (default: 'newspassid') */
   storageKey?: string;
+  /** Whether to inject segment meta tags in the head (default: true) */
+  injectMetaTags?: boolean;
 }
 
 export interface IdPayload {
@@ -63,11 +65,17 @@ export interface SegmentResponse {
   success: boolean;
 }
 
+// Segment types
+export interface SegmentKeyValue {
+  [key: string]: string;
+}
+
 // Main NewsPassID interface
 export interface NewsPassID {
   setID(id?: string, publisherSegments?: string[]): Promise<string>;
   getID(): string | null;
   getSegments(): string[];
+  getSegmentsAsKeyValue(): SegmentKeyValue;
   clearID(): void;
 }
 
@@ -76,7 +84,7 @@ declare global {
   interface Window {
     __gpp?: GPP;
     newspassid?: NewsPassID;
-    newspassid_q?: any[][];
+    newspassid_q?: Array<[string, ...unknown[]]>;
     newspass_segments?: string[];
     createNewsPassID?: (config: NewsPassConfig) => NewsPassID;
     newspass_initialized?: boolean;

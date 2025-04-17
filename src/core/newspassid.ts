@@ -1,7 +1,7 @@
 /**
  * NewsPassID main implementation
  */
-import { NewsPassID, NewsPassConfig, IdPayload, SegmentResponse } from './types';
+import { NewsPassID, NewsPassConfig, IdPayload, SegmentKeyValue } from './types';
 import { getGppConsentString } from './gpp-api';
 import { getStoredId, storeId } from '../utils/storage';
 import { generateId } from '../utils/random';
@@ -11,11 +11,13 @@ class NewsPassIDImpl implements NewsPassID {
   private config: NewsPassConfig;
   private segments: string[] = [];
   private consentString?: string;
+  private segmentKeyValue: SegmentKeyValue = {};
   
   constructor(config: NewsPassConfig) {
     this.config = {
       ...config,
-      storageKey: config.storageKey || 'newspassid'
+      storageKey: config.storageKey || 'newspassid',
+      injectMetaTags: config.injectMetaTags !== false // default to true
     };
     
     console.log(`newspassid initialized with namespace: ${config.namespace}`);
@@ -52,11 +54,17 @@ class NewsPassIDImpl implements NewsPassID {
       const response = await sendToBackend(this.config.lambdaEndpoint, payload);
       if (response && response.segments) {
         this.segments = response.segments;
+        this.segmentKeyValue = this.convertSegmentsToKeyValue(response.segments);
         this.applySegmentsToPage(response.segments);
+        
+        // Inject meta tags if enabled
+        if (this.config.injectMetaTags) {
+          this.injectSegmentMetaTags();
+        }
         
         // Dispatch event to notify that segments are ready
         window.dispatchEvent(new CustomEvent('newspass_segments_ready', {
-          detail: { segments: this.segments }
+          detail: { segments: this.segments, segmentKeyValue: this.segmentKeyValue }
         }));
       }
     } catch (error) {
@@ -81,12 +89,21 @@ class NewsPassIDImpl implements NewsPassID {
   }
 
   /**
+   * Get segments as key-value pairs
+   */
+  getSegmentsAsKeyValue(): SegmentKeyValue {
+    return { ...this.segmentKeyValue };
+  }
+
+  /**
    * Clear the stored ID
    */
   clearID(): void {
     try {
       localStorage.removeItem(this.config.storageKey!);
       this.segments = [];
+      this.segmentKeyValue = {};
+      this.removeSegmentMetaTags();
       console.log('newspassid: ID cleared successfully');
     } catch (e) {
       console.warn('newspassid: Unable to remove from localStorage:', e);
@@ -98,6 +115,42 @@ class NewsPassIDImpl implements NewsPassID {
    */
   private generateId(): string {
     return generateId(this.config.namespace);
+  }
+
+  /**
+   * Convert segment array to key-value pairs
+   */
+  private convertSegmentsToKeyValue(segments: string[]): SegmentKeyValue {
+    return segments.reduce((acc, segment) => {
+      // Convert segment to lowercase and replace non-alphanumeric chars with underscore
+      const key = segment.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      acc[key] = segment;
+      return acc;
+    }, {} as SegmentKeyValue);
+  }
+
+  /**
+   * Inject segment meta tags into the document head
+   */
+  private injectSegmentMetaTags(): void {
+    // Remove any existing meta tags first
+    this.removeSegmentMetaTags();
+
+    // Add new meta tags for each segment
+    Object.entries(this.segmentKeyValue).forEach(([key, value]) => {
+      const meta = document.createElement('meta');
+      meta.setAttribute('name', `newspass_segment_${key}`);
+      meta.setAttribute('content', value);
+      document.head.appendChild(meta);
+    });
+  }
+
+  /**
+   * Remove all NewsPassID segment meta tags from the document head
+   */
+  private removeSegmentMetaTags(): void {
+    const existingTags = document.head.querySelectorAll('meta[name^="newspass_segment_"]');
+    existingTags.forEach(tag => tag.remove());
   }
 
   /**
