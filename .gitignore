@@ -4,6 +4,7 @@
 
 # Dependencies
 /node_modules
+/lambda/node_modules
 /.pnp
 .pnp.js
 

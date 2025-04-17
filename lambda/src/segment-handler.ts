@@ -1,15 +1,19 @@
-/**
- * Segment handling functions
- */
-const fs = require('fs').promises;
+import { promises as fs } from 'fs';
+
+interface SegmentData {
+  [id: string]: string[];
+}
 
 /**
  * Get user segments from the segments.json file (written by Snowflake)
  */
-async function getUserSegmentsFromFile(id, url, segmentsFile) {
+export async function getUserSegmentsFromFile(
+  id: string,
+  segmentsFile: string
+): Promise<string[]> {
   try {
     // Try to read the segments file - this will be written by Snowflake
-    let segmentData;
+    let segmentData: SegmentData = {};
     
     try {
       const fileContent = await fs.readFile(segmentsFile, 'utf8');
@@ -17,7 +21,7 @@ async function getUserSegmentsFromFile(id, url, segmentsFile) {
     } catch (error) {
       console.warn(`Could not read segments file ${segmentsFile}:`, error);
       // Return default segments
-      return getDefaultSegments(url);
+      return getDefaultSegments();
     }
     
     // Check if we have segments for this ID
@@ -25,11 +29,10 @@ async function getUserSegmentsFromFile(id, url, segmentsFile) {
       return segmentData[id];
     }
     
-    // Otherwise use default segments based on URL
-    return getDefaultSegments(url);
+    return getDefaultSegments();
   } catch (error) {
     console.error('Error getting user segments from file:', error);
-    return getDefaultSegments(url);
+    return getDefaultSegments();
   }
 }
 
@@ -37,11 +40,11 @@ async function getUserSegmentsFromFile(id, url, segmentsFile) {
  * Generate default segments based on URL patterns
  * Used as fallback when no segments are found in the file
  */
-function getDefaultSegments(url) {
+export function getDefaultSegments(): string[] {
   // Generate random segment IDs
   // These are opaque identifiers, not revealing any PII
   const segmentCount = Math.floor(Math.random() * 3) + 1; // 1-3 segments
-  const segments = [];
+  const segments: string[] = [];
   
   for (let i = 0; i < segmentCount; i++) {
     // Generate a random segment ID
@@ -49,9 +52,4 @@ function getDefaultSegments(url) {
   }
   
   return segments;
-}
-
-module.exports = {
-  getUserSegmentsFromFile,
-  getDefaultSegments
-};
+} 

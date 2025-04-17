@@ -1,0 +1,31 @@
+{
+  "name": "newspassid-lambda",
+  "version": "1.0.0",
+  "description": "NewsPassID Lambda Functions",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1532.0",
+    "csv-parse": "^5.5.3",
+    "snowflake-sdk": "^1.6.24"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.119",
+    "@types/aws-sdk": "^2.7.0",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.24",
+    "@types/snowflake-sdk": "^1.6.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.1",
+    "@typescript-eslint/parser": "^7.0.1",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
+  }
+} 

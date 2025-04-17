@@ -35,10 +35,20 @@ class NewsPassIDImpl implements NewsPassID {
     
     if (useId !== storedId) {
       storeId(this.config.storageKey!, useId);
+      
+      // Dispatch event to notify that ID has changed
+      window.dispatchEvent(new CustomEvent('newspassid:change', {
+        detail: { id: useId }
+      }));
     }
     
     // Get consent string
-    this.consentString = await getGppConsentString();
+    try {
+      this.consentString = await getGppConsentString();
+    } catch (error) {
+      console.warn('newspassid: Failed to get GPP consent:', error);
+      this.consentString = '';
+    }
     
     // Create payload for backend
     const payload: IdPayload = {
@@ -52,23 +62,43 @@ class NewsPassIDImpl implements NewsPassID {
     
     try {
       const response = await sendToBackend(this.config.lambdaEndpoint, payload);
+      
+      // Set segments from response or use publisher segments if provided
       if (response && response.segments) {
         this.segments = response.segments;
-        this.segmentKeyValue = this.convertSegmentsToKeyValue(response.segments);
-        this.applySegmentsToPage(response.segments);
+      } else if (publisherSegments) {
+        this.segments = publisherSegments;
+      }
+      
+      // Convert segments to key-value pairs
+      this.segmentKeyValue = this.convertSegmentsToKeyValue(this.segments);
+      
+      // Apply segments to page
+      this.applySegmentsToPage(this.segments);
+      
+      // Inject meta tags if enabled
+      if (this.config.injectMetaTags) {
+        this.injectSegmentMetaTags();
+      }
+      
+      // Dispatch event to notify that segments are ready
+      window.dispatchEvent(new CustomEvent('newspass_segments_ready', {
+        detail: { segments: this.segments, segmentKeyValue: this.segmentKeyValue }
+      }));
+    } catch (error) {
+      console.error('newspassid: Failed to send ID to backend:', error);
+      
+      // Use publisher segments if provided, even if backend call fails
+      if (publisherSegments) {
+        this.segments = publisherSegments;
+        this.segmentKeyValue = this.convertSegmentsToKeyValue(publisherSegments);
+        this.applySegmentsToPage(publisherSegments);
         
         // Inject meta tags if enabled
         if (this.config.injectMetaTags) {
           this.injectSegmentMetaTags();
         }
-        
-        // Dispatch event to notify that segments are ready
-        window.dispatchEvent(new CustomEvent('newspass_segments_ready', {
-          detail: { segments: this.segments, segmentKeyValue: this.segmentKeyValue }
-        }));
       }
-    } catch (error) {
-      console.error('newspassid: Failed to send ID to backend:', error);
     }
     
     return useId;
