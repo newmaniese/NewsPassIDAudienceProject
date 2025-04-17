@@ -1,13 +1,16 @@
 # NewsPassID
 
-A first-party identity and targeting solution for publishers.
+First-Party Identity and Targeting Solution for Publishers
 
 ## Features
 
-- Simple, one-line implementation for publishers
-- Privacy-compliant with IAB GPP API integration
-- Automatic ad targeting with first-party segments
-- High-entropy ID generation supporting 500M+ unique visitors
+- First-party ID generation and management
+- Segment-based targeting
+- GPP consent integration
+- Meta tag injection for segments
+- Publisher-specific namespace support
+- GDPR and CCPA compliant
+- Lightweight and fast implementation
 - Seamless integration with Google Ad Manager and other ad platforms
 
 ## Quick Start
