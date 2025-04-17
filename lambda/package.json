@@ -1,0 +1,9 @@
+{
+  "name": "newspassid-lambda",
+  "version": "1.0.0",
+  "description": "AWS Lambda handler for NewsPassID",
+  "main": "src/index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1400.0"
+  }
+}

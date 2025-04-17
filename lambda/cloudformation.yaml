@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'NewsPassID - Backend Infrastructure'
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: S3 bucket for storing ID data
+    Default: newspassid-data
+  
+  AllowedOrigins:
+    Type: String
+    Description: Comma-separated list of allowed origins for CORS
+    Default: '*'
+
+Resources:
+  # S3 Bucket for ID data
+  NewsPassIDBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: ['GET', 'PUT', 'POST']
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+  
+  # Lambda execution role
+  NewsPassIDLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Sub 'arn:aws:s3:::${BucketName}/*'
+
+  # Lambda function
+  NewsPassIDLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: NewsPassID
+      Runtime: nodejs16.x
+      Handler: src/index.handler
+      Role: !GetAtt NewsPassIDLambdaRole.Arn
+      Code:
+        S3Bucket: your-deployment-bucket
+        S3Key: newspassid-lambda.zip
+      Environment:
+        Variables:
+          STORAGE_BUCKET: !Ref BucketName
+          ID_FOLDER: newspassid
+          ALLOWED_ORIGINS: !Ref AllowedOrigins
+      Timeout: 10
+      MemorySize: 256
+
+  # API Gateway
+  NewsPassIDApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: NewsPassID API
+      Description: API for NewsPassID
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # API Resource
+  NewsPassIDResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref NewsPassIDApi
+      ParentId: !GetAtt NewsPassIDApi.RootResourceId
+      PathPart: newspassid
+
+  # POST Method
+  NewsPassIDMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref NewsPassIDApi
+      ResourceId: !Ref NewsPassIDResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${NewsPassIDLambda.Arn}/invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+
+  # OPTIONS Method (for CORS)
+  NewsPassIDOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref NewsPassIDApi
+      ResourceId: !Ref NewsPassIDResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+            ResponseTemplates:
+              application/json: '{}'
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+
+  # API Deployment
+  NewsPassIDApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - NewsPassIDMethod
+      - NewsPassIDOptionsMethod
+    Properties:
+      RestApiId: !Ref NewsPassIDApi
+      StageName: prod
+
+  # Lambda permission for API Gateway
+  NewsPassIDLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref NewsPassIDLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${NewsPassIDApi}/*/POST/newspassid
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL for NewsPassID"
+    Value: !Sub "https://${NewsPassIDApi}.execute-api.${AWS::Region}.amazonaws.com/prod/newspassid"
